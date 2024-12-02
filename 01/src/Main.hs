@@ -11,12 +11,11 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 module Main where
 
 import Data.List (sort, transpose)
-import Data.List.Split (splitOn)
 
 main :: IO ()
 main =
     readFile "data/input.txt"
-        >>= print . liftA2 (,) (uncurry f1) (uncurry f2) . (\(a : b : _) -> (a, b)) . transpose . map (map (read :: String -> Int) . splitOn "   ") . lines
+        >>= print . liftA2 (,) (uncurry f1) (uncurry f2) . (\(a : b : _) -> (a, b)) . transpose . map (map (read :: String -> Int) . words) . lines
 
 f1 :: [Int] -> [Int] -> Int
 f1 a b = sum $ zipWith (\x y -> if x > y then x - y else y - x) (sort a) (sort b)

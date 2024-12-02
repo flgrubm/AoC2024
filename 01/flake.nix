@@ -53,7 +53,6 @@
           customDependencies = hp: {
             # name = package;
             # hello = pkgs.hello;
-            split = hp.split;
           };
 
           dependencies = customDependencies;
