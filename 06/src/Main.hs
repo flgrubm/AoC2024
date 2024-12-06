@@ -22,7 +22,7 @@ m1 = fromLists
     , "..#......."
     , ".......#.."
     , ".........."
-    , ".#.#^....."
+    , ".#..^....."
     , "........#."
     , "#........."
     , "......#..."
@@ -34,13 +34,18 @@ main = do
     -- let matChar = m1
     let (space, guard@(GuardInfo (x, y, _))) = liftA2 (,) (fmap readCell) findGuard matChar
     -- print $ setElem (visit (Empty False False False False) UP) (4, 1) space
-    let space' = runGuard space guard
-        p1 = length $ filter isVisited $ toList space'
-        p2 = length $ filter (flip hasLoop guard . \pos -> setElem Obstacle pos space) $ filter (/= (x, y)) $ map fst $ filter (isVisited . snd) $ toList $ mapPos (,) space'
+    space' <- runGuard space guard
+    let p1 = length $ filter isVisited $ toList space'
+    p2 <- fmap (length . filter id) $ cvt $ map (flip hasLoop guard . \pos -> setElem Obstacle pos space) $ filter (/= (x, y)) $ map fst $ filter (isVisited . snd) $ toList $ mapPos (,) space'
+        -- map length $ map (filter (flip hasLoop guard .
+    print "Result:"
     print space
     print space'
     print (p1, p2)
     -- print $ length $ filter isVisited $ toList $ runGuard space guard
+
+cvt :: [IO a] -> IO [a]
+cvt = foldr (\x acc -> do {x' <- x; acc' <- acc; pure $ x' : acc'}) (pure [])
 
 data Direction = UP | RIGHT | DOWN | LEFT
     deriving (Show, Eq)
@@ -118,25 +123,29 @@ applySnd f (x, y) = (x, f y)
 (|>) :: a -> (a -> b) -> b
 (|>) = flip id
 
-stepGuard :: Matrix Cell -> GuardInfo -> (Matrix Cell, Maybe GuardInfo, Bool)
+stepGuard :: Matrix Cell -> GuardInfo -> IO (Matrix Cell, Maybe GuardInfo, Bool)
 stepGuard space guard@(GuardInfo (x, y, d)) = let
     currentCell = space ! (x, y)
     nextPos@(x', y') = nextPosition guard in
       case uncurry safeGet nextPos space of
           (Just e@(Empty {})) -> let (v, already) = visit e d
-              in (setElem (unVisit currentCell) (x, y) space |> setElem v (x', y'), Just $ GuardInfo (x', y', d), already)
+              in pure (setElem (unVisit currentCell) (x, y) space |> setElem v (x', y'), Just $ GuardInfo (x', y', d), already)
           (Just Obstacle) -> let (v, already) = visit currentCell (turn d)
-              in (setElem v (x, y) space, Just $ GuardInfo (x, y, turn d), already)
-          Nothing -> (setElem (unVisit currentCell) (x, y) space, Nothing, False) -- guard left the map
+              in pure (setElem v (x, y) space, Just $ GuardInfo (x, y, turn d), already)
+          Nothing -> pure (setElem (unVisit currentCell) (x, y) space, Nothing, False) -- guard left the map
 
-runGuard :: Matrix Cell -> GuardInfo -> Matrix Cell
-runGuard space guard = case stepGuard space guard of
-    (space', Just guard', False) -> runGuard space' guard'
-    (space', Just (GuardInfo (x, y, _)), True) -> setElem (unVisit (space' ! (x, y))) (x, y) space'
-    (space', _, _) -> space'
+runGuard :: Matrix Cell -> GuardInfo -> IO (Matrix Cell)
+runGuard space guard = do
+    res <- stepGuard space guard
+    case res of
+      (space', Just guard', False) -> runGuard space' guard'
+      (space', Just (GuardInfo (x, y, _)), True) -> pure $ setElem (unVisit (space' ! (x, y))) (x, y) space'
+      (space', _, _) -> pure space'
 
-hasLoop :: Matrix Cell -> GuardInfo -> Bool
-hasLoop space guard = case stepGuard space guard of
-    (space', Just guard', False) -> hasLoop space' guard'
-    (_, Nothing, False) -> False
-    (_, _, _) -> True
+hasLoop :: Matrix Cell -> GuardInfo -> IO Bool
+hasLoop space guard = do
+    res <- stepGuard space guard
+    case res of
+      (space', Just guard', False) -> hasLoop space' guard'
+      (_, Nothing, False) -> pure False
+      (_, _, _) -> pure True
