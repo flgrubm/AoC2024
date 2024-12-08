@@ -54,7 +54,7 @@
             # name = package;
             # hello = pkgs.hello;
             matrix = hp.matrix;
-            mtl = hp.mtl;
+            parallel = hp.parallel;
           };
 
           dependencies = customDependencies;

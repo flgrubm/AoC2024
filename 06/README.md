@@ -1,3 +1,3 @@
-# Day 5
+# Day 6
 
-Split original input into orderings (`./data/orders.txt`) and updates (`./data/updates.txt`).
+This part is not particularly optimized. Despite parallelism enabled, it took around 20 minutes to compute.

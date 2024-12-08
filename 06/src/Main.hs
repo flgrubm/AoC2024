@@ -13,34 +13,26 @@ module Main where
 import Data.Functor ((<&>))
 import Data.Matrix
 import Data.Maybe (isJust, fromJust)
+import Control.Parallel
+import Control.Parallel.Strategies
 
-m1 :: Matrix Char
-m1 = fromLists
-    [ "....#....."
-    , ".........#"
-    , ".........."
-    , "..#......."
-    , ".......#.."
-    , ".........."
-    , ".#.#^....."
-    , "........#."
-    , "#........."
-    , "......#..."
-    ]
+-- for parallelization
+-- source: https://book.realworldhaskell.org/read/concurrent-and-multicore-programming.html
+mapReduce :: Strategy b -> (a -> b) -> Strategy c -> ([b] -> c) -> [a] -> c
+mapReduce mapStrat mapFunc reduceStrat reduceFunc input =
+    mapResult `pseq` reduceResult
+  where mapResult    = parMap mapStrat mapFunc input
+        reduceResult = reduceFunc mapResult `using` reduceStrat
 
 main :: IO ()
 main = do
     matChar <- readFile "data/input.txt" <&> fromLists . lines
-    -- let matChar = m1
     let (space, guard@(GuardInfo (x, y, _))) = liftA2 (,) (fmap readCell) findGuard matChar
-    -- print $ setElem (visit (Empty False False False False) UP) (4, 1) space
-    let space' = runGuard space guard
+        space' = runGuard space guard
+        allOneAdditionalObstacle = map (\pos -> setElem Obstacle pos space) $ filter (/= (x, y)) $ map fst $ filter (isVisited . snd) $ toList $ mapPos (,) space'
         p1 = length $ filter isVisited $ toList space'
-        p2 = length $ filter (flip hasLoop guard . \pos -> setElem Obstacle pos space) $ filter (/= (x, y)) $ map fst $ filter (isVisited . snd) $ toList $ mapPos (,) space'
-    print space
-    print space'
+        p2 = mapReduce rpar (`hasLoop` guard) rseq (length . filter id) allOneAdditionalObstacle
     print (p1, p2)
-    -- print $ length $ filter isVisited $ toList $ runGuard space guard
 
 data Direction = UP | RIGHT | DOWN | LEFT
     deriving (Show, Eq)
@@ -70,11 +62,9 @@ visit (Guard _ u r d l) UP = (Guard UP True r d l, u)
 visit (Guard _ u r d l) RIGHT = (Guard RIGHT u True d l, r)
 visit (Guard _ u r d l) DOWN = (Guard DOWN u r True l, d)
 visit (Guard _ u r d l) LEFT = (Guard LEFT u r d True, l)
--- visit c _ = c
 
 unVisit :: Cell -> Cell
 unVisit (Guard _ u r d l) = Empty u r d l
--- unVisit c = c
 
 instance Show Cell where
     show Obstacle = "#"
@@ -96,6 +86,7 @@ readCell '#' = Obstacle
 readCell '^' = Guard UP True False False False
 readCell 'X' = Empty True True True True
 
+-- maybe return guard with current position
 charIsGuard :: (Int, Int) -> Char -> Maybe (Int, Int, Direction)
 charIsGuard (x, y) '^' = Just (x, y, UP)
 charIsGuard (x, y) '>' = Just (x, y, RIGHT)
@@ -103,21 +94,23 @@ charIsGuard (x, y) 'v' = Just (x, y, DOWN)
 charIsGuard (x, y) '<' = Just (x, y, LEFT)
 charIsGuard _ _ = Nothing
 
+-- extracts guard from
 findGuard :: Matrix Char -> GuardInfo
 findGuard = GuardInfo . fromJust . head . filter isJust . toList . mapPos charIsGuard
 
+-- next coordinates
 nextPosition :: GuardInfo -> (Int, Int)
 nextPosition (GuardInfo (x, y, UP)) = (x - 1, y)
 nextPosition (GuardInfo (x, y, RIGHT)) = (x, y + 1)
 nextPosition (GuardInfo (x, y, DOWN)) = (x + 1, y)
 nextPosition (GuardInfo (x, y, LEFT)) = (x, y - 1)
 
-applySnd :: (b -> c) -> (a, b) -> (a, c)
-applySnd f (x, y) = (x, f y)
-
+-- pipe result of previous function call to the next function
 (|>) :: a -> (a -> b) -> b
 (|>) = flip id
 
+-- move the guard one step further, turn right if hitting an obstacle, or return no guard, if guard has left the map
+-- Boolean value says if the next cell has already been visited in the same direction (i.e. closing a loop)
 stepGuard :: Matrix Cell -> GuardInfo -> (Matrix Cell, Maybe GuardInfo, Bool)
 stepGuard space guard@(GuardInfo (x, y, d)) = let
     currentCell = space ! (x, y)
@@ -129,14 +122,17 @@ stepGuard space guard@(GuardInfo (x, y, d)) = let
               in (setElem v (x, y) space, Just $ GuardInfo (x, y, turn d), already)
           Nothing -> (setElem (unVisit currentCell) (x, y) space, Nothing, False) -- guard left the map
 
+-- advance the guard until it leaves the map or closes a loop
 runGuard :: Matrix Cell -> GuardInfo -> Matrix Cell
 runGuard space guard = case stepGuard space guard of
     (space', Just guard', False) -> runGuard space' guard'
     (space', Just (GuardInfo (x, y, _)), True) -> setElem (unVisit (space' ! (x, y))) (x, y) space'
     (space', _, _) -> space'
 
+-- returns whether the guard ends up in a loop
 hasLoop :: Matrix Cell -> GuardInfo -> Bool
 hasLoop space guard = case stepGuard space guard of
     (space', Just guard', False) -> hasLoop space' guard'
     (_, Nothing, False) -> False
     (_, _, _) -> True
+
