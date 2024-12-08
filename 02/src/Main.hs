@@ -15,7 +15,8 @@ main =
     readFile "data/input.txt"
         >>= print . liftA2 (,) f1 f2 . map (map (read :: String -> Int) . words) . lines
 
-data SafetyAcc = Init
+data SafetyAcc
+    = Init
     | Safe Int
     | Unsafe
 
@@ -25,12 +26,12 @@ checkSafeStep m Init = Safe m
 checkSafeStep _ Unsafe = Unsafe
 checkSafeStep m (Safe n)
     | m < n && n < m + 4 = Safe m
-    | otherwise          = Unsafe
+    | otherwise = Unsafe
 
 isSafe :: [Int] -> Bool
 isSafe xs = case foldr checkSafeStep Init xs of
     Unsafe -> False
-    _      -> True
+    _ -> True
 
 -- creates a bitmask `:: [Bool]` of length `total` where exactly `min (total, toDrop)` elements are `False` (`total` choose `toDrop` many)
 maskN :: Int -> Int -> [[Bool]]

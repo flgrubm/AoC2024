@@ -10,19 +10,20 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 module Main where
 
-import Data.Functor ((<&>))
-import Data.Matrix
-import Data.Maybe (isJust, fromJust)
 import Control.Parallel
 import Control.Parallel.Strategies
+import Data.Functor ((<&>))
+import Data.Matrix
+import Data.Maybe (fromJust, isJust)
 
 -- for parallelization
 -- source: https://book.realworldhaskell.org/read/concurrent-and-multicore-programming.html
 mapReduce :: Strategy b -> (a -> b) -> Strategy c -> ([b] -> c) -> [a] -> c
 mapReduce mapStrat mapFunc reduceStrat reduceFunc input =
     mapResult `pseq` reduceResult
-  where mapResult    = parMap mapStrat mapFunc input
-        reduceResult = reduceFunc mapResult `using` reduceStrat
+  where
+    mapResult = parMap mapStrat mapFunc input
+    reduceResult = reduceFunc mapResult `using` reduceStrat
 
 main :: IO ()
 main = do
@@ -43,11 +44,12 @@ turn RIGHT = DOWN
 turn DOWN = LEFT
 turn LEFT = UP
 
-data Cell = Obstacle
-          | Empty Bool Bool Bool Bool
-          | Guard Direction Bool Bool Bool Bool
-          | Boom
-          deriving (Eq)
+data Cell
+    = Obstacle
+    | Empty Bool Bool Bool Bool
+    | Guard Direction Bool Bool Bool Bool
+    | Boom
+    deriving (Eq)
 
 isVisited :: Cell -> Bool
 isVisited (Empty u r d l) = u || r || d || l
@@ -68,7 +70,7 @@ unVisit (Guard _ u r d l) = Empty u r d l
 
 instance Show Cell where
     show Obstacle = "#"
-    show e@(Empty {})
+    show e@(Empty{})
         | isVisited e = "X"
         | otherwise = "."
     show (Guard UP _ _ _ _) = "^"
@@ -112,15 +114,19 @@ nextPosition (GuardInfo (x, y, LEFT)) = (x, y - 1)
 -- move the guard one step further, turn right if hitting an obstacle, or return no guard, if guard has left the map
 -- Boolean value says if the next cell has already been visited in the same direction (i.e. closing a loop)
 stepGuard :: Matrix Cell -> GuardInfo -> (Matrix Cell, Maybe GuardInfo, Bool)
-stepGuard space guard@(GuardInfo (x, y, d)) = let
-    currentCell = space ! (x, y)
-    nextPos@(x', y') = nextPosition guard in
-      case uncurry safeGet nextPos space of
-          (Just e@(Empty {})) -> let (v, already) = visit e d
-              in (setElem (unVisit currentCell) (x, y) space |> setElem v (x', y'), Just $ GuardInfo (x', y', d), already)
-          (Just Obstacle) -> let (v, already) = visit currentCell (turn d)
-              in (setElem v (x, y) space, Just $ GuardInfo (x, y, turn d), already)
-          Nothing -> (setElem (unVisit currentCell) (x, y) space, Nothing, False) -- guard left the map
+stepGuard space guard@(GuardInfo (x, y, d)) =
+    let
+        currentCell = space ! (x, y)
+        nextPos@(x', y') = nextPosition guard
+     in
+        case uncurry safeGet nextPos space of
+            (Just e@(Empty{})) ->
+                let (v, already) = visit e d
+                 in (setElem (unVisit currentCell) (x, y) space |> setElem v (x', y'), Just $ GuardInfo (x', y', d), already)
+            (Just Obstacle) ->
+                let (v, already) = visit currentCell (turn d)
+                 in (setElem v (x, y) space, Just $ GuardInfo (x, y, turn d), already)
+            Nothing -> (setElem (unVisit currentCell) (x, y) space, Nothing, False) -- guard left the map
 
 -- advance the guard until it leaves the map or closes a loop
 runGuard :: Matrix Cell -> GuardInfo -> Matrix Cell
@@ -135,4 +141,3 @@ hasLoop space guard = case stepGuard space guard of
     (space', Just guard', False) -> hasLoop space' guard'
     (_, Nothing, False) -> False
     (_, _, _) -> True
-

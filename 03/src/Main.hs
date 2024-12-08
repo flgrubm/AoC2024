@@ -7,21 +7,21 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -}
-
 {-# LANGUAGE TupleSections #-}
 
 module Main where
 
+import Data.Char
 import Data.List (foldl', sortOn, tails)
 import Data.Ord
-import Data.Char
 
 main :: IO ()
 main =
     readFile "data/input.txt"
         >>= print . liftA2 (,) f1 f2
 
-data Token = Unmatched
+data Token
+    = Unmatched
     | Mul
     | LParen
     | RParen
@@ -32,14 +32,16 @@ data Token = Unmatched
     deriving (Show, Eq)
 
 keywords :: [(Token, String)]
-keywords = sortOn (Data.Ord.Down . length . snd)
-    [ (Mul, "mul")
-    , (LParen, "(")
-    , (RParen, ")")
-    , (Comma, ",")
-    , (Do, "do()")
-    , (Dont, "don't()")
-    ]
+keywords =
+    sortOn
+        (Data.Ord.Down . length . snd)
+        [ (Mul, "mul")
+        , (LParen, "(")
+        , (RParen, ")")
+        , (Comma, ",")
+        , (Do, "do()")
+        , (Dont, "don't()")
+        ]
 
 -- filter the keywords that can still match after reading the current character
 filterKeywords :: Char -> [(Token, String)] -> [(Token, String)]
@@ -58,9 +60,10 @@ tryMatchNumeric :: String -> Int -> Int -> Maybe (Token, Int)
 tryMatchNumeric [] subtotal n
     | n <= 0 = Nothing
     | otherwise = Just (Numeric subtotal, n)
-tryMatchNumeric (c : rest) subtotal n = if isDigit c
-    then tryMatchNumeric rest (subtotal * 10 + digitToInt c) (n + 1)
-    else tryMatchNumeric "" subtotal n
+tryMatchNumeric (c : rest) subtotal n =
+    if isDigit c
+        then tryMatchNumeric rest (subtotal * 10 + digitToInt c) (n + 1)
+        else tryMatchNumeric "" subtotal n
 
 -- try to match a token at the current location
 tryMatch :: String -> (Token, Int)
@@ -77,7 +80,8 @@ collectTokens (lst, skip) (t, len)
         _ -> (t : lst, len - 1)
     | otherwise = (lst, skip - 1)
 
-data Operation = Prod Int Int
+data Operation
+    = Prod Int Int
     | EnableProd
     | DisableProd
     deriving (Show, Eq)
@@ -89,8 +93,8 @@ translateTokens (Dont : rest) = DisableProd : translateTokens rest
 translateTokens [] = []
 translateTokens (_ : rest) = translateTokens rest
 
-parse:: String -> [Operation]
-parse = translateTokens .reverse . tail . fst . foldl' collectTokens ([], 0) . map tryMatch . tails
+parse :: String -> [Operation]
+parse = translateTokens . reverse . tail . fst . foldl' collectTokens ([], 0) . map tryMatch . tails
 
 f :: ((Int, Bool) -> Operation -> (Int, Bool)) -> String -> Int
 f g = fst . foldl' g (0, True) . parse

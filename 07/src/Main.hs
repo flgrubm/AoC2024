@@ -25,11 +25,12 @@ newtype Candidate = C (Int, Int, [Int]) -- (Target, First, Rest)
     deriving (Eq, Show)
 
 readC :: String -> Candidate
-readC str = let ws = words str
-                target = (read :: String -> Int) $ init $ head ws
-                first = (read :: String -> Int) $ head $ tail ws
-                rest = map (read :: String -> Int) $ tail $ tail ws
-            in C (target, first, rest)
+readC str =
+    let ws = words str
+        target = (read :: String -> Int) $ init $ head ws
+        first = (read :: String -> Int) $ head $ tail ws
+        rest = map (read :: String -> Int) $ tail $ tail ws
+     in C (target, first, rest)
 
 -- apply an operation on two integers, use with left-fold
 applyOp :: Int -> (Int, Operator) -> Int
