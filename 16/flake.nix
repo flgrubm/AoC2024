@@ -57,6 +57,8 @@
             hashable = hp.hashable;
             ghc = hp.ghc;
             matrix = hp.matrix;
+            mtl = hp.mtl;
+            transformers = hp.transformers;
           };
 
           dependencies = customDependencies;
