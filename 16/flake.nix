@@ -59,6 +59,7 @@
             matrix = hp.matrix;
             mtl = hp.mtl;
             transformers = hp.transformers;
+            extra = hp.extra;
           };
 
           dependencies = customDependencies;
